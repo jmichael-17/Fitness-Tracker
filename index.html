@@ -2003,11 +2003,16 @@ function initData(){
     backupPhotos().then(function(ps){
       var t=JSON.stringify({app:'iron-island',v:2,saved:new Date().toISOString(),weights:state.weights,workouts:state.workouts,program:state.program,photos:ps});
       var name='iron-island-backup-'+today()+'.json', blob=new Blob([t],{type:'application/json'});
-      var file=null; try{file=new File([blob],name,{type:'application/json'})}catch(e){}
-      if(file&&navigator.canShare&&navigator.canShare({files:[file]})&&/iPhone|iPad|Android/i.test(navigator.userAgent)){
-        return navigator.share({files:[file],title:name}).then(function(){toast('Backup saved: '+ps.length+(ps.length===1?' photo':' photos')+' included')}).catch(function(e){if(!e||e.name!=='AbortError') downloadBlob(blob,name,ps.length)});
-      }
-      downloadBlob(blob,name,ps.length);
+      var c=window.claude, n=ps.length, msg='Backup saved: '+n+(n===1?' photo':' photos')+' included';
+      var dlP=c&&typeof c.use==='function'?Promise.resolve().then(function(){return c.use('downloads')}).catch(function(){return null}):Promise.resolve(null);
+      return dlP.then(function(dl){
+        if(dl) return dl.save({filename:name,data:blob}).then(function(){toast(msg)}).catch(function(e){if(e&&e.code==='declined') return; toast('Could not save the file here. Use Copy backup text instead.')});
+        var file=null; try{file=new File([blob],name,{type:'application/json'})}catch(e){}
+        if(file&&navigator.canShare&&navigator.canShare({files:[file]})&&/iPhone|iPad|Android/i.test(navigator.userAgent)){
+          return navigator.share({files:[file],title:name}).then(function(){toast(msg)}).catch(function(e){if(!e||e.name!=='AbortError') downloadBlob(blob,name,n)});
+        }
+        downloadBlob(blob,name,n);
+      });
     }).catch(function(){toast('Could not build the backup file')}).then(function(){b.disabled=false; b.textContent=old});
   });
   var pendingFile=null, fileArmed=false, fileTimer;
